@@ -5,7 +5,6 @@ import { Announcement } from "./Announcement";
 
 dotenv.config();
 
-// Interface for User attributes
 interface UserAttributes {
   id?: number;
   username: string;
@@ -13,19 +12,13 @@ interface UserAttributes {
   email: string;
   role: "admin" | "super_admin";
   status?: "pending" | "approved" | "rejected";
-  otp?: string | null;
-  otpExpiresAt?: Date | null;
+  remarks: object;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-// Fields that are optional when creating
-type UserCreationAttributes = Optional<
-  UserAttributes,
-  "id" | "status" | "otp" | "otpExpiresAt"
->;
+type UserCreationAttributes = Optional<UserAttributes, "id" | "status">;
 
-// Model class
 export class User
   extends Model<UserAttributes, UserCreationAttributes>
   implements UserAttributes
@@ -36,13 +29,10 @@ export class User
   public email!: string;
   public role!: "admin" | "super_admin";
   public status!: "pending" | "approved" | "rejected";
-  public otp!: string | null;
-  public otpExpiresAt!: Date | null;
-
+  public remarks!: object;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
-
 
 User.init(
   {
@@ -68,13 +58,9 @@ User.init(
       type: DataTypes.ENUM("pending", "approved", "rejected"),
       defaultValue: "pending",
     },
-    otp: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    otpExpiresAt: {
-      type: DataTypes.DATE,
-      allowNull: true,
+    remarks: {
+      type: DataTypes.JSONB,
+      allowNull: false,
     },
   },
   {
@@ -82,4 +68,3 @@ User.init(
     modelName: "User",
   }
 );
-
