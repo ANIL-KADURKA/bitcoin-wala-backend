@@ -1,13 +1,11 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import express, { Application } from "express";
-import bodyParser from "body-parser";
+import express from "express";
+
 import { sequelize } from "./src/connection/connection";
 import cors from "cors";
 import { router } from "./src/routes/router";
-
-import { adminRouter } from "./src/routes/admin-registration";
 
 const app = express();
 const port: number = parseInt(process.env.PORT || "5000");
@@ -29,7 +27,7 @@ const startServer = async () => {
     });
   } catch (err: any) {
     console.error("Database connection error:", err.message);
-    process.exit(1); 
+    process.exit(1);
   }
 };
 
