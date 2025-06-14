@@ -1,43 +1,47 @@
-const express = require('express');
-const router = express.Router();
+import express, { Request, Response } from "express";
+import { Subscriber } from "../models/Subscriber"; 
+
+export const subscriptionRoouter = express.Router();
 
 
-
-router.post('/create-subscriber', async (req, res) => {
+subscriptionRoouter.post("/create-subscriber", async (req: Request, res: Response) => {
   try {
     const { email, name, phone, organization } = req.body;
 
     const [subscriber, created] = await Subscriber.findOrCreate({
       where: { email },
       defaults: {
+        email,
         name,
         phone,
         organization,
         is_active: true,
         is_subscribed: true,
-      }
+      },
     });
 
     if (!created) {
-      return res.status(400).json({ message: "Subscriber already exists." });
+      res.status(400).json({ message: "Subscriber already exists." });
+      return;
     }
 
     res.status(201).json(subscriber);
   } catch (error) {
-    console.error('Error creating subscriber:', error);
-    res.status(500).json({ error: 'Failed to subscribe.' });
+    console.error("Error creating subscriber:", error);
+    res.status(500).json({ error: "Failed to subscribe." });
   }
 });
 
-
-router.post('/unsubscribe', async (req, res) => {
+// Unsubscribe
+subscriptionRoouter.post("/unsubscribe", async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
 
     const subscriber = await Subscriber.findOne({ where: { email } });
 
     if (!subscriber) {
-      return res.status(404).json({ message: "Subscriber not found." });
+      res.status(404).json({ message: "Subscriber not found." });
+      return;
     }
 
     subscriber.is_active = false;
@@ -46,59 +50,60 @@ router.post('/unsubscribe', async (req, res) => {
 
     res.json({ message: "Unsubscribed successfully." });
   } catch (error) {
-    console.error('Error unsubscribing:', error);
-    res.status(500).json({ error: 'Failed to unsubscribe.' });
+    console.error("Error unsubscribing:", error);
+    res.status(500).json({ error: "Failed to unsubscribe." });
   }
 });
 
-
-router.post('/resubscribe', async (req, res) => {
+// Resubscribe
+subscriptionRoouter.post("/resubscribe", async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
 
     const subscriber = await Subscriber.findOne({ where: { email } });
 
     if (!subscriber) {
-      return res.status(404).json({ message: "Subscriber not found." });
+      res.status(404).json({ message: "Subscriber not found." });
+      return;
     }
 
     if (subscriber.is_active && subscriber.is_subscribed) {
-      return res.status(200).json({ message: "You are already subscribed." });
+      res.status(200).json({ message: "You are already subscribed." });
+      return;
     }
 
     subscriber.is_active = true;
     subscriber.is_subscribed = true;
-
     await subscriber.save();
 
     res.json({ message: "You have successfully resubscribed." });
   } catch (error) {
-    console.error('Error resubscribing:', error);
-    res.status(500).json({ error: 'Failed to resubscribe.' });
+    console.error("Error resubscribing:", error);
+    res.status(500).json({ error: "Failed to resubscribe." });
   }
 });
 
-
-
-router.delete('/subscriber/:email', async (req, res) => {
+// Delete subscriber
+subscriptionRoouter.delete("/subscriber/:email", async (req: Request, res: Response) => {
   try {
     const { email } = req.params;
 
     const deletedCount = await Subscriber.destroy({ where: { email } });
 
     if (deletedCount === 0) {
-      return res.status(404).json({ message: "Subscriber not found." });
+      res.status(404).json({ message: "Subscriber not found." });
+      return;
     }
 
     res.json({ message: "Subscriber deleted permanently." });
   } catch (error) {
-    console.error('Error deleting subscriber:', error);
-    res.status(500).json({ error: 'Failed to delete subscriber.' });
+    console.error("Error deleting subscriber:", error);
+    res.status(500).json({ error: "Failed to delete subscriber." });
   }
 });
 
-
-router.put('/subscriber/:email', async (req, res) => {
+// Update subscriber
+subscriptionRoouter.put("/subscriber/:email", async (req: Request, res: Response) => {
   try {
     const { email } = req.params;
     const { name, phone, organization } = req.body;
@@ -106,7 +111,8 @@ router.put('/subscriber/:email', async (req, res) => {
     const subscriber = await Subscriber.findOne({ where: { email } });
 
     if (!subscriber) {
-      return res.status(404).json({ message: "Subscriber not found." });
+      res.status(404).json({ message: "Subscriber not found." });
+      return;
     }
 
     subscriber.name = name || subscriber.name;
@@ -117,7 +123,8 @@ router.put('/subscriber/:email', async (req, res) => {
 
     res.json({ message: "Subscriber updated successfully." });
   } catch (error) {
-    console.error('Error updating subscriber:', error);
-    res.status(500).json({ error: 'Failed to update subscriber.' });
+    console.error("Error updating subscriber:", error);
+    res.status(500).json({ error: "Failed to update subscriber." });
   }
 });
+

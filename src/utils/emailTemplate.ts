@@ -1,4 +1,14 @@
-function generateAnnouncementEmail(announcement) {
+interface Announcement {
+  title: string;
+  description: string;
+  schedule_time: string | Date;
+  expiry_date: string | Date;
+}
+
+export default function generateAnnouncementEmail(announcement: Announcement): string {
+  const scheduleTime = new Date(announcement.schedule_time).toLocaleString();
+  const expiryDate = new Date(announcement.expiry_date).toLocaleString();
+
   return `
     <html>
       <body style="font-family: Arial, sans-serif; color: #333; background-color: #f4f4f4; padding: 20px;">
@@ -17,8 +27,8 @@ function generateAnnouncementEmail(announcement) {
           <h2 style="color: #2a7ae2;">${announcement.title}</h2>
           <p>${announcement.description}</p>
 
-          <p><strong>Scheduled Time:</strong> ${new Date(announcement.schedule_time).toLocaleString()}</p>
-          <p><strong>Expiry Date:</strong> ${new Date(announcement.expiry_date).toLocaleString()}</p>
+          <p><strong>Scheduled Time:</strong> ${scheduleTime}</p>
+          <p><strong>Expiry Date:</strong> ${expiryDate}</p>
 
           <hr style="margin: 30px 0;">
 
@@ -40,7 +50,7 @@ function generateAnnouncementEmail(announcement) {
 
           <!-- Footer -->
           <p style="font-size: 0.75em; color: #aaa; text-align: center; margin-top: 30px;">
-            You received this email because you're subscribed to announcements from organization name .<br>
+            You received this email because you're subscribed to announcements from organization name.<br>
             &copy; ${new Date().getFullYear()} Your Company. All rights reserved.
           </p>
         </div>
@@ -48,5 +58,3 @@ function generateAnnouncementEmail(announcement) {
     </html>
   `;
 }
-
-module.exports = generateAnnouncementEmail;
