@@ -3,11 +3,11 @@ import bcrypt from "bcrypt";
 import { User } from "../models/User";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
+import { getEmail } from "../utils/getAdminEmail";
 
 export const adminRouter = express.Router();
 
 adminRouter.post("/register-admin", async (req: Request, res: Response) => {
-  console.log("camee");
   const {
     username,
     password,
@@ -22,6 +22,7 @@ adminRouter.post("/register-admin", async (req: Request, res: Response) => {
       email,
       role: "admin",
       status: "pending",
+      remarks: {},
     });
     res
       .status(201)
@@ -32,6 +33,48 @@ adminRouter.post("/register-admin", async (req: Request, res: Response) => {
   }
 });
 
+adminRouter.put("/:id", async (req: Request, res: Response) => {
+  try {
+    const [updated] = await User.update(req.body, {
+      where: { id: req.params.id },
+    });
+
+    if (!updated) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+
+    const updatedUser = await User.findByPk(req.params.id);
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    console.error("Update Error:", error);
+    res.status(500).json({ error: "Failed to update user" });
+  }
+});
+
+adminRouter.post("/email/:id", async (req: Request, res: Response) => {
+  try {
+    const {
+      password,
+      email,
+    }: { username: string; password: string; email: string } = req.body;
+    const id = req.params.id;
+    const user = await User.findOne({ where: { id } });
+    if (!user || user.role !== "admin") {
+      res.status(404).json({ message: "Admin not found" });
+      return;
+    }
+    const emailObj = {
+      email: email,
+      password: password,
+    };
+    user.remarks = emailObj;
+    await user.save();
+    res.json({ message: "Added email and token successfully." });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 adminRouter.post("/approve-admin/:id", async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -51,7 +94,6 @@ adminRouter.post("/approve-admin/:id", async (req: Request, res: Response) => {
   }
 });
 
-
 adminRouter.post("/reject-admin/:id", async (req: Request, res: Response) => {
   const { id } = req.params;
 
@@ -69,7 +111,6 @@ adminRouter.post("/reject-admin/:id", async (req: Request, res: Response) => {
   }
 });
 
-
 adminRouter.get("/pending-admins", async (_req: Request, res: Response) => {
   try {
     const pendingAdmins = await User.findAll({
@@ -82,7 +123,6 @@ adminRouter.get("/pending-admins", async (_req: Request, res: Response) => {
   }
 });
 
-
 adminRouter.get("/active-admins", async (_req: Request, res: Response) => {
   try {
     const activeAdmins = await User.findAll({
@@ -94,7 +134,6 @@ adminRouter.get("/active-admins", async (_req: Request, res: Response) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 adminRouter.post("/login", async (req: Request, res: Response) => {
   const { username, password }: { username: string; password: string } =
@@ -122,11 +161,10 @@ adminRouter.post("/login", async (req: Request, res: Response) => {
   }
 });
 
-
 adminRouter.post(
   "/request-reset-password",
   async (req: Request, res: Response) => {
-    const { email }: { email: string } = req.body;
+    const { email, otp }: { email: string; otp: string } = req.body;
 
     try {
       const user = await User.findOne({ where: { email } });
@@ -134,27 +172,47 @@ adminRouter.post(
         res.status(404).json({ message: "Email not registered" });
         return;
       }
-
-      const otp = Math.floor(100000 + Math.random() * 900000).toString(); 
-      const expires = new Date(Date.now() + 10 * 60 * 1000); 
-
-      user.otp = otp;
-      user.otpExpiresAt = expires;
       await user.save();
 
+      const result = await getEmail();
+
+      if (!result) {
+        res.status(503).json({ message: "Service unavailable" });
+        return;
+      }
+
+      const { sendingEmail, password } = result;
+
       const transporter = nodemailer.createTransport({
-        service: "gmail",
+        host: "smtp.gmail.com",
+        port: 465,
+        secure: true,
         auth: {
-          user: process.env.MAIL_USER,
-          pass: process.env.MAIL_PASS,
+          user: sendingEmail,
+          pass: password,
         },
       });
 
       await transporter.sendMail({
-        from: process.env.MAIL_USER,
+        from: sendingEmail,
         to: email,
         subject: "Password Reset OTP",
-        text: `Your OTP is: ${otp}`,
+        html: `
+    <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: auto; padding: 20px; border-radius: 10px; background-color: #f9f9f9; border: 1px solid #e0e0e0;">
+      <h2 style="color: #333;">Password Reset Request for Bitcoinwala.ai</h2>
+      <p style="font-size: 16px; color: #555;">Hi ${user.username},</p>
+      <p style="font-size: 16px; color: #555;">
+        We received a request to reset your password. Please use the OTP below to proceed:
+      </p>
+      <div style="text-align: center; margin: 30px 0;">
+        <span style="font-size: 32px; font-weight: bold; letter-spacing: 2px; color: #007BFF;">${otp}</span>
+      </div>
+      <p style="font-size: 14px; color: #888;">
+        This OTP is valid for the next 10 minutes.
+      </p>
+      <p style="font-size: 14px; color: #aaa; margin-top: 30px;">– Bitcoin Team</p>
+    </div>
+  `,
       });
 
       res.json({ message: "OTP sent to your email." });
@@ -164,13 +222,20 @@ adminRouter.post(
   }
 );
 
-
 adminRouter.post("/reset-password", async (req: Request, res: Response) => {
   const {
     email,
     otp,
+    userOtp,
     newPassword,
-  }: { email: string; otp: string; newPassword: string } = req.body;
+    expiresAt,
+  }: {
+    email: string;
+    otp: string;
+    userOtp: string;
+    newPassword: string;
+    expiresAt: Date;
+  } = req.body;
 
   try {
     const user = await User.findOne({ where: { email } });
@@ -179,14 +244,12 @@ adminRouter.post("/reset-password", async (req: Request, res: Response) => {
       return;
     }
 
-    if (!user.otp || user.otp !== otp) {
+    if (!userOtp || String(userOtp) !== String(otp)) {
       res.status(400).json({ message: "Invalid OTP" });
       return;
     }
 
-    if (new Date() > user.otpExpiresAt!) {
-      user.otp = null;
-      user.otpExpiresAt = null;
+    if (new Date() > expiresAt!) {
       await user.save();
       res.status(400).json({ message: "OTP expired" });
       return;
@@ -194,8 +257,6 @@ adminRouter.post("/reset-password", async (req: Request, res: Response) => {
 
     const hashed = await bcrypt.hash(newPassword, 10);
     user.password = hashed;
-    user.otp = null;
-    user.otpExpiresAt = null;
     await user.save();
 
     res.json({ message: "Password reset successful." });
