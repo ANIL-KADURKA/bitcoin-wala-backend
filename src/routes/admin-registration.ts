@@ -1,7 +1,6 @@
 import express, { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import { User } from "../models/User";
-import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { getEmail } from "../utils/getAdminEmail";
 
@@ -28,7 +27,6 @@ adminRouter.post("/register-admin", async (req: Request, res: Response) => {
       .status(201)
       .json({ message: "Registration submitted. Awaiting approval." });
   } catch (err: any) {
-    console.log(err);
     res.status(400).json({ error: err.message });
   }
 });
@@ -136,13 +134,13 @@ adminRouter.get("/active-admins", async (_req: Request, res: Response) => {
 });
 
 adminRouter.post("/login", async (req: Request, res: Response) => {
-  const { username, password }: { username: string; password: string } =
+  const { email, password }: { email: string; password: string } =
     req.body;
 
   try {
-    const user = await User.findOne({ where: { username } });
+    const user = await User.findOne({ where: { email } });
     if (!user) {
-      res.status(404).json({ message: "User not found" });
+      res.status(404).json({ message: "User with provided email not found" });
       return;
     }
     const match = await bcrypt.compare(password, user.password);
@@ -154,7 +152,6 @@ adminRouter.post("/login", async (req: Request, res: Response) => {
       res.status(403).json({ message: "Admin registration not approved yet." });
       return;
     }
-
     res.json({ message: "Login successful", user });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -169,7 +166,7 @@ adminRouter.post(
     try {
       const user = await User.findOne({ where: { email } });
       if (!user) {
-        res.status(404).json({ message: "Email not registered" });
+        res.status(404).json({ message: "Please enter your registered email" });
         return;
       }
       await user.save();
@@ -177,7 +174,7 @@ adminRouter.post(
       const result = await getEmail();
 
       if (!result) {
-        res.status(503).json({ message: "Service unavailable" });
+        res.status(503).json({ message: "Service unavailable. Please try again later" });
         return;
       }
 
@@ -214,8 +211,8 @@ adminRouter.post(
     </div>
   `,
       });
-
-      res.json({ message: "OTP sent to your email." });
+      console.log("email sent")
+      res.status(200).json({ message: "OTP sent to your email." });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -225,14 +222,9 @@ adminRouter.post(
 adminRouter.post("/reset-password", async (req: Request, res: Response) => {
   const {
     email,
-    otp,
-    userOtp,
     newPassword,
-    expiresAt,
   }: {
     email: string;
-    otp: string;
-    userOtp: string;
     newPassword: string;
     expiresAt: Date;
   } = req.body;
@@ -243,18 +235,6 @@ adminRouter.post("/reset-password", async (req: Request, res: Response) => {
       res.status(404).json({ message: "User not found" });
       return;
     }
-
-    if (!userOtp || String(userOtp) !== String(otp)) {
-      res.status(400).json({ message: "Invalid OTP" });
-      return;
-    }
-
-    if (new Date() > expiresAt!) {
-      await user.save();
-      res.status(400).json({ message: "OTP expired" });
-      return;
-    }
-
     const hashed = await bcrypt.hash(newPassword, 10);
     user.password = hashed;
     await user.save();
