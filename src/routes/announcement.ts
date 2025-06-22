@@ -5,62 +5,60 @@ import multer from "multer";
 import nodemailer from "nodemailer";
 import { getEmail } from "../utils/getAdminEmail";
 import generateAnnouncementEmail from "../utils/emailTemplate";
+import path from "path";
+import fs from "fs";
 
 export const announcementRouter = express.Router();
 
-const storage = multer.memoryStorage();
+// Utility to convert image path to base64
+const getImageBase64 = (imageUrl: string | null): string | null => {
+  if (!imageUrl) return null;
+  const fullPath = path.join(__dirname, "../../", imageUrl);
+  if (!fs.existsSync(fullPath)) return null;
+
+  const mimeType = `image/${path.extname(fullPath).substring(1)}`;
+  const buffer = fs.readFileSync(fullPath);
+  return `data:${mimeType};base64,${buffer.toString("base64")}`;
+};
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, "uploads/"),
+  filename: (_req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+});
 const upload = multer({ storage });
 
-announcementRouter.get("/:id/image", async (req: Request, res: Response) => {
+announcementRouter.post("/:id", upload.single("image"), async (req: Request, res: Response): Promise<void> => {
   try {
-    const announcement = await Announcement.findByPk(req.params.id);
-    if (!announcement || !announcement.image_data) {
-      res.status(404).send("Image not found");
-      return;
-    }
-    res.set("Content-Type", "image/jpeg");
-    res.send(announcement.image_data);
+    const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
+    const data = {
+      ...req.body,
+      created_by: Number(req.params.id),
+      image_url: imagePath,
+    };
+    const announcement = await Announcement.create(data);
+    const announcementWithImageUrl = {
+      ...announcement.toJSON(),
+      image: imagePath ? `${req.protocol}://${req.get("host")}${imagePath}` : null,
+      image_data: getImageBase64(imagePath),
+    };
+    res.status(201).json(announcementWithImageUrl);
   } catch (error) {
-    console.error("Fetch Image Error:", error);
-    res.status(500).send("Error retrieving image");
+    console.error("Create Error:", error);
+    res.status(500).json({ error: "Failed to create announcement" });
   }
 });
 
-announcementRouter.post(
-  "/:id",
-  upload.single("image"),
-  async (req: Request, res: Response) => {
-    try {
-      const buffer = req.file ? req.file.buffer : null;
-      const data = {
-        ...req.body,
-        created_by: Number(req.params.id),
-        image_data: buffer,
-      };
-      const announcement = await Announcement.create(data);
-      const announcementWithImageUrl = {
-        ...announcement.toJSON(),
-        image: `${req.protocol}://${req.get("host")}/announcement/${
-          announcement.id
-        }/image`,
-      };
-
-      res.status(201).json(announcementWithImageUrl);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to create announcement" });
-    }
-  }
-);
-
-announcementRouter.get("/", async (req: Request, res: Response) => {
+announcementRouter.get("/", async (req: Request, res: Response): Promise<void> => {
   try {
     const announcements = await Announcement.findAll();
-    const enrichedAnnouncements = announcements.map((a: any) => ({
-      ...a.toJSON(),
-      image: a.image_data
-        ? `${req.protocol}://${req.get("host")}/announcement/${a.id}/image`
-        : null,
-    }));
+    const enrichedAnnouncements = announcements.map((a: any) => {
+      const imagePath = a.image_url || null;
+      return {
+        ...a.toJSON(),
+        image: imagePath ? `${req.protocol}://${req.get("host")}${imagePath}` : null,
+        image_data: getImageBase64(imagePath),
+      };
+    });
     res.status(200).json(enrichedAnnouncements);
   } catch (error) {
     console.error("Fetch Error:", error);
@@ -68,84 +66,61 @@ announcementRouter.get("/", async (req: Request, res: Response) => {
   }
 });
 
-announcementRouter.get("/:id", async (req: Request, res: Response) => {
+announcementRouter.get("/:id", async (req: Request, res: Response): Promise<void> => {
   try {
     const announcement = await Announcement.findByPk(req.params.id);
     if (!announcement) {
       res.status(404).json({ error: "Not found" });
       return;
     }
-    res.status(200).json(announcement);
+    const imagePath = announcement.image_url || null;
+    res.status(200).json({
+      ...announcement.toJSON(),
+      image: imagePath ? `${req.protocol}://${req.get("host")}${imagePath}` : null,
+      image_data: getImageBase64(imagePath),
+    });
   } catch (error) {
     console.error("Fetch by ID Error:", error);
     res.status(500).json({ error: "Error fetching announcement" });
   }
 });
 
-announcementRouter.put(
-  "/:id/:announcementId",
-  upload.single("image"),
-  async (req: Request, res) => {
-    try {
-      const updateData: any = {};
-      const fields = req.body;
-
-      if (fields.title) updateData.title = fields.title;
-      if (fields.description) updateData.description = fields.description;
-      if (fields.status) updateData.status = fields.status;
-      if (fields.schedule_time) updateData.schedule_time = fields.schedule_time;
-      if (fields.expiry_date) updateData.expiry_date = fields.expiry_date;
-      if (fields.show_on_dashboard !== undefined) {
-        updateData.show_on_dashboard = fields.show_on_dashboard;
-      }
-      if (fields.send_email !== undefined) {
-        updateData.send_email = fields.send_email;
-      }
-      if (req.params.id) {
-        updateData.created_by = Number(req.params.id);
-      }
-      if (req.file) {
-        updateData.image_data = req.file.buffer;
-      }
-
-      const [updated] = await Announcement.update(updateData, {
-        where: { id: Number(req.params.announcementId) },
-      });
-
-      if (!updated) {
-        res.status(404).json({ error: "Not found" });
-        return;
-      }
-      console.log(updated);
-      const updatedAnnouncement = await Announcement.findByPk(
-        Number(req.params.announcementId)
-      );
-
-      const updatedAnnouncementWithImageUrl = {
-        ...updatedAnnouncement?.toJSON(),
-        image: `${req.protocol}://${req.get("host")}/announcement/${
-          updatedAnnouncement!.id
-        }/image`,
-      };
-      console.log("woth url", updatedAnnouncementWithImageUrl);
-      res.status(200).json(updatedAnnouncementWithImageUrl);
-    } catch (error) {
-      console.error("Update Error:", error);
-      res.status(500).json({ error: "Failed to update announcement" });
-    }
-  }
-);
-announcementRouter.delete("/:id", async (req: Request, res: Response) => {
+announcementRouter.put("/:id/:announcementId", upload.single("image"), async (req: Request, res: Response): Promise<void> => {
   try {
-    const deleted = await Announcement.destroy({
-      where: { id: req.params.id },
+    const updateData: any = { ...req.body };
+    if (req.file) updateData.image_url = `/uploads/${req.file.filename}`;
+    if (req.params.id) updateData.created_by = Number(req.params.id);
+
+    const [updated] = await Announcement.update(updateData, {
+      where: { id: Number(req.params.announcementId) },
     });
 
-    if (!deleted) {
+    if (!updated) {
       res.status(404).json({ error: "Not found" });
       return;
     }
 
+    const updatedAnnouncement = await Announcement.findByPk(Number(req.params.announcementId));
+    const imagePath = updatedAnnouncement?.image_url || null;
+
+    res.status(200).json({
+      ...updatedAnnouncement?.toJSON(),
+      image: imagePath ? `${req.protocol}://${req.get("host")}${imagePath}` : null,
+      image_data: getImageBase64(imagePath),
+    });
+  } catch (error) {
+    console.error("Update Error:", error);
+    res.status(500).json({ error: "Failed to update announcement" });
+  }
+});
+
+announcementRouter.delete("/:id", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deleted = await Announcement.destroy({ where: { id: req.params.id } });
+    if (!deleted) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
     res.status(204).send();
   } catch (error) {
     console.error("Delete Error:", error);
@@ -153,14 +128,13 @@ announcementRouter.delete("/:id", async (req: Request, res: Response) => {
   }
 });
 
-announcementRouter.post("/:id/publish", async (req: Request, res: Response) => {
+announcementRouter.post("/:id/publish", async (req: Request, res: Response): Promise<void> => {
   try {
     const announcement = await Announcement.findByPk(req.params.id);
     if (!announcement) {
       res.status(404).json({ error: "Not found" });
       return;
     }
-
     announcement.status = "published";
     await announcement.save();
 
@@ -169,70 +143,57 @@ announcementRouter.post("/:id/publish", async (req: Request, res: Response) => {
     }
     res.json(announcement);
   } catch (error) {
-    console.log(error);
+    console.error("Publish Error:", error);
     res.status(500).json({ error: "Failed to publish announcement" });
   }
 });
 
-announcementRouter.post(
-  "/:id/inactive",
-  async (req: Request, res: Response) => {
-    try {
-      const announcement = await Announcement.findByPk(req.params.id);
-      if (!announcement) {
-        res.status(404).json({ error: "Not found" });
-        return;
-      }
-
-      announcement.status = "inactive";
-      await announcement.save();
-      res.status(200).json(announcement);
-    } catch (error) {
-      console.error("Inactive Error:", error);
-      res.status(500).json({ error: "Failed to mark inactive" });
+announcementRouter.post("/:id/inactive", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const announcement = await Announcement.findByPk(req.params.id);
+    if (!announcement) {
+      res.status(404).json({ error: "Not found" });
+      return;
     }
+    announcement.status = "inactive";
+    await announcement.save();
+    res.status(200).json(announcement);
+  } catch (error) {
+    console.error("Inactive Error:", error);
+    res.status(500).json({ error: "Failed to mark inactive" });
   }
-);
+});
 
-announcementRouter.post(
-  "/subscriber/:announcmentId",
-  async (req: Request, res: Response) => {
-    try {
-      const announcementId = req.params.announcmentId;
-      const subscriberId = req.body.subscriberId;
-      const subscriberEmail = req.body.subscriberEmail;
-      const result = await getEmail();
+announcementRouter.post("/subscriber/:announcmentId", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const announcementId = req.params.announcmentId;
+    const subscriberEmail = req.body.subscriberEmail;
+    const result = await getEmail();
+    const announcement = await Announcement.findByPk(announcementId);
 
-      const announcement = await Announcement.findByPk(announcementId);
-      if (!result || !announcement) {
-        res
-          .status(503)
-          .json({ message: "Service unavailable. Please try again later" });
-        return;
-      }
-
-      const { sendingEmail, password } = result;
-
-      const transporter = nodemailer.createTransport({
-        host: "smtp.gmail.com",
-        port: 465,
-        secure: true,
-        auth: {
-          user: sendingEmail,
-          pass: password,
-        },
-      });
-
-      await transporter.sendMail({
-        from: sendingEmail,
-        to: subscriberEmail,
-        subject: announcement.title,
-        html: generateAnnouncementEmail(announcement, subscriberEmail),
-      });
-      res.status(200).json({"message":"Email Sent"});
-    } catch (error) {
-      console.error("Inactive Error:", error);
-      res.status(500).json({ error: "Failed to send mail to subscriber" });
+    if (!result || !announcement) {
+      res.status(503).json({ message: "Service unavailable. Please try again later" });
+      return;
     }
+
+    const { sendingEmail, password } = result;
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: { user: sendingEmail, pass: password },
+    });
+
+    await transporter.sendMail({
+      from: sendingEmail,
+      to: subscriberEmail,
+      subject: announcement.title,
+      html: generateAnnouncementEmail(announcement, subscriberEmail),
+    });
+
+    res.status(200).json({ message: "Email Sent" });
+  } catch (error) {
+    console.error("Send Mail Error:", error);
+    res.status(500).json({ error: "Failed to send mail to subscriber" });
   }
-);
+});

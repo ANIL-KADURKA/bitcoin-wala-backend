@@ -6,14 +6,14 @@ interface AnnouncementAttributes {
   id?: number;
   title: string;
   description: string;
-  image_data: Buffer;
+  image_url: string;  //  Updated: made optional and type string | undefined
   status: "draft" | "scheduled" | "published" | "inactive";
   schedule_time: Date;
   expiry_date: Date;
   show_on_dashboard: boolean;
   send_email: boolean;
   is_email_sent: boolean;
-  email_targets?: any; 
+  email_targets?: any;
   created_by: string;
   click_count: number;
   createdAt?: Date;
@@ -23,6 +23,7 @@ interface AnnouncementAttributes {
 type AnnouncementCreationAttributes = Optional<
   AnnouncementAttributes,
   | "id"
+  | "image_url"
   | "status"
   | "email_targets"
   | "click_count"
@@ -31,7 +32,7 @@ type AnnouncementCreationAttributes = Optional<
   | "is_email_sent"
   | "createdAt"
   | "updatedAt"
->;
+>
 
 export class Announcement
   extends Model<AnnouncementAttributes, AnnouncementCreationAttributes>
@@ -40,7 +41,7 @@ export class Announcement
   public id!: number;
   public title!: string;
   public description!: string;
-  public image_data!: Buffer;
+  public image_url!:string;  // 👈 Updated
   public status!: "draft" | "scheduled" | "published" | "inactive";
   public schedule_time!: Date;
   public expiry_date!: Date;
@@ -55,7 +56,6 @@ export class Announcement
   public readonly updatedAt!: Date;
 }
 
-
 Announcement.init(
   {
     title: {
@@ -66,9 +66,9 @@ Announcement.init(
       type: DataTypes.TEXT,
       allowNull: false,
     },
-    image_data: {
-     type: DataTypes.BLOB('long'),
-      allowNull: true,
+    image_url: {
+      type: DataTypes.STRING,
+      allowNull: false
     },
     status: {
       type: DataTypes.ENUM("draft", "scheduled", "published", "inactive"),
@@ -102,7 +102,7 @@ Announcement.init(
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: "Users", 
+        model: "Users",
         key: "id",
       },
       onUpdate: "CASCADE",
@@ -120,15 +120,12 @@ Announcement.init(
   }
 );
 
-
 User.hasMany(Announcement, {
   foreignKey: 'created_by',
-  as: 'announcements'
+  as: 'announcements',
 });
 
 Announcement.belongsTo(User, {
   foreignKey: "created_by",
-  as: "creator", 
+  as: "creator",
 });
-
-

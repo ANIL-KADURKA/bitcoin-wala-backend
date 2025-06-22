@@ -2,7 +2,6 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
-
 import { sequelize } from "./src/connection/connection";
 import cors from "cors";
 import { router } from "./src/routes/router";
@@ -18,19 +17,28 @@ app.use(
     credentials: true,
   })
 );
-app.use(bodyParser.json());
 
+app.use(bodyParser.json());
 app.use(express.json());
+
+// ✅ Serve static images
+app.use("/uploads", express.static("uploads")); 
+
+
+
+// ✅ API routes
 app.use("/", router);
+app.use("/announcement", announcementRouter);
+
+// ✅ Health check route
 app.get("/", async (req, res) => {
   res.status(200).send({ message: "pong" });
 });
-app.use("/announcement", announcementRouter)
 
 const startServer = async () => {
   try {
     await sequelize.authenticate();
-    await sequelize.sync({alter:true});
+    await sequelize.sync({ alter: true });
     console.log("Database connected.");
     app.listen(port, () => {
       console.log(`Server running at http://localhost:${port}`);
