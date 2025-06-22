@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { runAnnouncementCron } from "../utils/cronHandlers";
 
-cron.schedule("0 9 * * *", async () => {
+cron.schedule("50 17 * * *", async () => {
   console.log("🔁 Running scheduled announcement cron...");
 
   try {

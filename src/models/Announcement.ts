@@ -67,8 +67,8 @@ Announcement.init(
       allowNull: false,
     },
     image_data: {
-     type: DataTypes.BLOB,
-      allowNull: false,
+     type: DataTypes.BLOB('long'),
+      allowNull: true,
     },
     status: {
       type: DataTypes.ENUM("draft", "scheduled", "published", "inactive"),

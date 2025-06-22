@@ -3,6 +3,10 @@ import bcrypt from "bcrypt";
 import { User } from "../models/User";
 import nodemailer from "nodemailer";
 import { getEmail } from "../utils/getAdminEmail";
+import bodyParser from "body-parser";
+import { fileURLToPath } from "url";
+import path from "path";
+import fs from 'fs'
 
 export const adminRouter = express.Router();
 
@@ -58,7 +62,7 @@ adminRouter.post("/email/:id", async (req: Request, res: Response) => {
     }: { username: string; password: string; email: string } = req.body;
     const id = req.params.id;
     const user = await User.findOne({ where: { id } });
-    if (!user || user.role !== "admin") {
+    if (!user || user.role !== "super_admin") {
       res.status(404).json({ message: "Admin not found" });
       return;
     }
@@ -66,10 +70,31 @@ adminRouter.post("/email/:id", async (req: Request, res: Response) => {
       email: email,
       password: password,
     };
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: {
+        user: email,
+        pass: password,
+      },
+    });
+
+    await transporter.sendMail({
+      from: email,
+      to: 'ushasrigudikandula456@gmail.com',
+      subject: "Password Reset OTP",
+      html: `
+        <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: auto; padding: 20px; border-radius: 10px; background-color: #f9f9f9; border: 1px solid #e0e0e0;">
+          <h2 style="color: #333;">Test Email</h2>
+        </div>
+      `,
+    });
     user.remarks = emailObj;
     await user.save();
     res.json({ message: "Added email and token successfully." });
   } catch (err: any) {
+    console.log(err)
     res.status(500).json({ error: err.message });
   }
 });
@@ -243,4 +268,31 @@ adminRouter.post("/reset-password", async (req: Request, res: Response) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+
+// const __filename = fileURLToPath(import.meta.url);
+const baseDir = path.resolve();
+const jsonPath = path.join(baseDir, "whitepaper.json");
+adminRouter.get("/api/whitepaper", (req, res) => {
+  fs.readFile(jsonPath, "utf-8", (err, data) => {
+    if (err) {
+      console.error("Error reading whitepaper:", err);
+      return res.status(500).json({ error: "Unable to read file." });
+    }
+    res.json(JSON.parse(data));
+  });
+});
+
+// POST: Overwrite JSON
+adminRouter.post("/api/whitepaper", (req, res) => {
+  const updatedData = req.body;
+
+  fs.writeFile(jsonPath, JSON.stringify(updatedData, null, 2), (err) => {
+    if (err) {
+      console.error("Error writing file:", err);
+      return res.status(500).json({ error: "Unable to write file." });
+    }
+    res.json({ message: "File updated successfully ✅" });
+  });
 });
