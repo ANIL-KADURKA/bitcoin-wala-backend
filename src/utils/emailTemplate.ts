@@ -41,9 +41,8 @@ export default function generateAnnouncementEmail(announcement: Announcement,nam
 
           <!-- Unsubscribe -->
           <div style="text-align: center; font-size: 0.8em; color: #888; margin-top: 40px;">
-            <p>If you no longer wish to receive these emails, you can <a href="https://yourdomain.com/unsubscribe?email=__EMAIL__" style="color: #2a7ae2;">unsubscribe here</a>.</p>
+            <p>If you no longer wish to receive these emails, you can <a href="https://bitcoinwala.ai/unsubscribe?email=__EMAIL__" style="color: #2a7ae2;">unsubscribe here</a>.</p>
           </div>
-
           <!-- Footer -->
           <p style="font-size: 0.75em; color: #aaa; text-align: center; margin-top: 30px;">
             You received this email because you're subscribed to announcements from Bitcoinwala.<br>
