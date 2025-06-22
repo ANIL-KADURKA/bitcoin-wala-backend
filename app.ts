@@ -7,12 +7,27 @@ import cors from "cors";
 import { router } from "./src/routes/router";
 import { announcementRouter } from "./src/routes/announcement";
 import bodyParser from "body-parser";
+import path from "path";
+import fs from "fs";
 
 const app = express();
 const port: number = parseInt(process.env.PORT || "5000");
 
-const allowedOrigins = ["http://localhost:5173", "https://bitcoinwala.ai"];
+console.log("me")
+console.log("📌 Current working directory:", process.cwd());
 
+
+// 🔧 Ensure uploads directory exists
+const uploadsPath = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadsPath)) {
+  fs.mkdirSync(uploadsPath, { recursive: true });
+  console.log("📁 'uploads/' directory created.");
+} else {
+  console.log("📁 'uploads/' directory already exists.");
+}
+
+// 🔓 CORS setup
+const allowedOrigins = ["http://localhost:5173", "https://bitcoinwala.ai"];
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -26,33 +41,33 @@ app.use(
   })
 );
 
+// 🧠 Body parsers
 app.use(bodyParser.json());
 app.use(express.json());
 
-// ✅ Serve static images
-app.use("/uploads", express.static("uploads")); 
+// 🖼️ Serve uploaded files statically
+app.use("/uploads", express.static(uploadsPath));
 
-
-
-// ✅ API routes
+// 📦 API routes
 app.use("/", router);
 app.use("/announcement", announcementRouter);
 
-// ✅ Health check route
-app.get("/", async (req, res) => {
+// 🔁 Health check route
+app.get("/", async (_req, res) => {
   res.status(200).send({ message: "pong" });
 });
 
+// 🚀 Start server
 const startServer = async () => {
   try {
     await sequelize.authenticate();
-    await sequelize.sync({ alter: true });
-    console.log("Database connected.");
+    await sequelize.sync({ alter: true }); // or { force: false } if preferred
+    console.log("✅ Database connected.");
     app.listen(port, () => {
-      console.log(`Server running at http://localhost:${port}`);
+      console.log(`🚀 Server running at http://localhost:${port}`);
     });
   } catch (err: any) {
-    console.error("Database connection error:", err.message);
+    console.error("❌ Database connection error:", err.message);
     process.exit(1);
   }
 };
