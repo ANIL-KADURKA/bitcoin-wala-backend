@@ -11,9 +11,17 @@ import bodyParser from "body-parser";
 const app = express();
 const port: number = parseInt(process.env.PORT || "5000");
 
+const allowedOrigins = ["http://localhost:5173", "https://bitcoinwala.ai"];
+
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
