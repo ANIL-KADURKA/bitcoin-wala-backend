@@ -6,7 +6,7 @@ import { getEmail } from "../utils/getAdminEmail";
 import bodyParser from "body-parser";
 import { fileURLToPath } from "url";
 import path from "path";
-import fs from 'fs'
+import fs from "fs";
 
 export const adminRouter = express.Router();
 
@@ -82,7 +82,7 @@ adminRouter.post("/email/:id", async (req: Request, res: Response) => {
 
     await transporter.sendMail({
       from: email,
-      to: 'ushasrigudikandula456@gmail.com',
+      to: "ushasrigudikandula456@gmail.com",
       subject: "Password Reset OTP",
       html: `
         <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: auto; padding: 20px; border-radius: 10px; background-color: #f9f9f9; border: 1px solid #e0e0e0;">
@@ -94,7 +94,7 @@ adminRouter.post("/email/:id", async (req: Request, res: Response) => {
     await user.save();
     res.json({ message: "Added email and token successfully." });
   } catch (err: any) {
-    console.log(err)
+    console.log(err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -159,8 +159,7 @@ adminRouter.get("/active-admins", async (_req: Request, res: Response) => {
 });
 
 adminRouter.post("/login", async (req: Request, res: Response) => {
-  const { email, password }: { email: string; password: string } =
-    req.body;
+  const { email, password }: { email: string; password: string } = req.body;
 
   try {
     const user = await User.findOne({ where: { email } });
@@ -199,7 +198,9 @@ adminRouter.post(
       const result = await getEmail();
 
       if (!result) {
-        res.status(503).json({ message: "Service unavailable. Please try again later" });
+        res
+          .status(503)
+          .json({ message: "Service unavailable. Please try again later" });
         return;
       }
 
@@ -236,7 +237,7 @@ adminRouter.post(
     </div>
   `,
       });
-      console.log("email sent")
+      console.log("email sent");
       res.status(200).json({ message: "OTP sent to your email." });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -270,7 +271,6 @@ adminRouter.post("/reset-password", async (req: Request, res: Response) => {
   }
 });
 
-
 // const __filename = fileURLToPath(import.meta.url);
 const baseDir = path.resolve();
 const jsonPath = path.join(baseDir, "whitepaper.json");
@@ -291,8 +291,34 @@ adminRouter.post("/api/whitepaper", (req, res) => {
   fs.writeFile(jsonPath, JSON.stringify(updatedData, null, 2), (err) => {
     if (err) {
       console.error("Error writing file:", err);
-      return res.status(500).json({ error: "Unable to write file." });
+       res.status(500).json({ error: "Unable to write file." });
+       return;
     }
     res.json({ message: "File updated successfully ✅" });
   });
 });
+
+const contentPath = path.join(baseDir, "content.json");
+adminRouter.post("/content", (req, res) => {
+  const newContent = req.body;
+  try {
+    fs.writeFileSync(contentPath, JSON.stringify(newContent, null, 2));
+    res.json({ success: true, message: "Content saved!" });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to save file." });
+  }
+});
+
+adminRouter.get("/content", (req, res) => {
+  try {
+    
+    const data = fs.readFileSync(contentPath, "utf-8");
+    res.json(JSON.parse(data));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to read file." });
+  }
+});
+
